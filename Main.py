@@ -4,11 +4,10 @@ from ctypes import cast, POINTER
 import time
 
 # --- SETTINGS ---
-THRESHOLD = 0.25  #"Real" loudness limit
+THRESHOLD = 0.40  #"Real" loudness limit
 MUTE_DURATION = 5  # Minimum time to stay muted
-SAFE_LEVEL = 0.15  # Raw signal must drop below this before unmuting
-CHECK_INTERVAL = 0.05
-
+SAFE_LEVEL = 0.35  # Raw signal must drop below this before unmuting
+CHECK_INTERVAL = 0.01
 
 def main():
     devices = AudioUtilities.GetDeviceEnumerator()
@@ -20,7 +19,7 @@ def main():
     volume_interface = endpoint.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
     volume = cast(volume_interface, POINTER(IAudioEndpointVolume))
 
-    print(f"--- Stubborn 40% Limiter Active ---")
+    print(f"--- Limiter Active ---")
     print(f"Monitoring... (Will force mute even if you move the slider)")
 
     muted_by_script = False
