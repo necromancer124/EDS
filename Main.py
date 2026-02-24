@@ -4,10 +4,11 @@ from ctypes import cast, POINTER
 import time
 
 # --- SETTINGS ---
-THRESHOLD = 0.40  #"Real" loudness limit
-MUTE_DURATION = 5  # Minimum time to stay muted
-SAFE_LEVEL = 0.35  # Raw signal must drop below this before unmuting
+THRESHOLD = 0.40
+MUTE_DURATION = 5
+SAFE_LEVEL = 0.35
 CHECK_INTERVAL = 0.01
+
 
 def main():
     devices = AudioUtilities.GetDeviceEnumerator()
@@ -19,48 +20,56 @@ def main():
     volume_interface = endpoint.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
     volume = cast(volume_interface, POINTER(IAudioEndpointVolume))
 
-    print(f"--- Limiter Active ---")
-    print(f"Monitoring... (Will force mute even if you move the slider)")
+    print("--- Limiter Active ---")
+    print("Monitoring... (Press Ctrl+C to stop)")
 
     muted_by_script = False
     mute_time = 0
+    trigger_level = 0
 
     try:
         while True:
-            # 1. Get raw signal and master volume
             raw_peak = meter.GetPeakValue()
             master_vol = volume.GetMasterVolumeLevelScalar()
             actual_level = raw_peak * master_vol
-
-            # Check if Windows unmuted itself behind the script's back
             current_mute_state = volume.GetMute()
 
-            # 2. Logic: Should we Mute?
+            line_output = ""
+
+            # 1. Trigger Mute
             if actual_level > THRESHOLD and not muted_by_script:
                 volume.SetMute(1, None)
                 muted_by_script = True
                 mute_time = time.time()
-                print(f"\n[!] LIMIT HIT: {actual_level * 100:.1f}% - Muting...")
+                trigger_level = actual_level * 100  # Store what it was for the display
 
-            # 3. Logic: Maintenance (Force mute if Windows tries to unmute)
+            # 2. Mute Maintenance & Unmute Logic
             if muted_by_script:
-                # If Windows unmuted but our timer isn't done, force it back to Mute
                 if current_mute_state == 0:
                     volume.SetMute(1, None)
 
                 elapsed = time.time() - mute_time
-                if elapsed >= MUTE_DURATION:
+
+                if elapsed < MUTE_DURATION:
+                    # Still in the forced mute period
+                    countdown = MUTE_DURATION - elapsed
+                    line_output = f"[MUTED] Too Loud ({trigger_level:.1f}%) | Wait: {countdown:.1f}s"
+                else:
+                    # Time is up, but is it safe?
                     if raw_peak < SAFE_LEVEL:
                         volume.SetMute(0, None)
                         muted_by_script = False
-                        print(f"\n[✓] SAFE: Unmuted (Signal: {raw_peak * 100:.1f}%)")
                     else:
-                        print(f"\r[WAIT] Still loud... Signal: {raw_peak * 100:>5.1f}%", end="")
+                        line_output = f"[WAIT] Still loud ({raw_peak * 100:.1f}%) | Waiting for silence..."
 
-            # Visual feedback
+            # 3. Normal Operating View
             if not muted_by_script:
                 bar = '█' * int(30 * actual_level) + '-' * (30 - int(30 * actual_level))
-                print(f"\r[OK] Level: [{bar}] {actual_level * 100:>5.1f}%", end="", flush=True)
+                line_output = f"[OK] Level: [{bar}] {actual_level * 100:5.1f}%"
+
+            # Clear and rewrite whole line
+            # The extra spaces at the end ensure old long messages are wiped
+            print(f"\r{line_output:<80}", end="", flush=True)
 
             time.sleep(CHECK_INTERVAL)
 
