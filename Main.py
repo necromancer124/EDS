@@ -1,121 +1,94 @@
-from pycaw.pycaw import AudioUtilities, IAudioMeterInformation, IAudioEndpointVolume
-from comtypes import CLSCTX_ALL
-from ctypes import cast, POINTER
+from pycaw.pycaw import AudioUtilities, IAudioMeterInformation, ISimpleAudioVolume
 import time
+import sys
 
 # --- SETTINGS ---
-THRESHOLD = 0.25  # Trigger protection when actual output > 25%
-SAFE_LEVEL = 0.20  # Peak must drop below this to restore
-MUTE_DURATION = 2.0  # Seconds to stay protected before testing again
-CHECK_INTERVAL = 0.01
-
-USE_MUTE = False  # True = Mute completely, False = Lower volume
-LOWER_PERCENT = 0.20  # Volume level for "Lowered" mode (20%)
+THRESHOLD = 0.25  # 25% Trigger
+SAFE_LEVEL = 0.20  # 20% Safe to return
+MUTE_DURATION = 2.0
+USE_MUTE = False  # True = Mute app, False = Lower to 20%
+LOWER_PERCENT = 0.20
 
 
 def main():
-    # Initialize Audio Devices
-    devices = AudioUtilities.GetDeviceEnumerator()
-    endpoint = devices.GetDefaultAudioEndpoint(0, 0)
-
-    meter_interface = endpoint.Activate(IAudioMeterInformation._iid_, CLSCTX_ALL, None)
-    meter = cast(meter_interface, POINTER(IAudioMeterInformation))
-
-    volume_interface = endpoint.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
-    volume = cast(volume_interface, POINTER(IAudioEndpointVolume))
-
-    print("--- Limiter Active ---")
-    print(f"Monitoring... Trigger: {THRESHOLD * 100}% | Safe: {SAFE_LEVEL * 100}%")
-
-    protected = False
-    protection_start_time = 0
-    trigger_level = 0
-    original_volume = None
+    print("--- Per-App Limiter Active (Single Line Mode) ---")
+    app_states = {}  # { "Name": [original_vol, start_time, is_protected, safe_ticks] }
 
     try:
         while True:
-            # 1. CHECK THE SOUND FIRST
-            raw_peak = meter.GetPeakValue()
-            master_vol = volume.GetMasterVolumeLevelScalar()
-            actual_level = raw_peak * master_vol
+            sessions = AudioUtilities.GetAllSessions()
+            loudest_app = ""
+            max_level = 0.0
+            any_protected = False
+            protected_name = ""
 
-            line_output = ""
+            for session in sessions:
+                if not session.Process: continue
+                name = session.Process.name()
+                meter = session._ctl.QueryInterface(IAudioMeterInformation)
+                volume_control = session._ctl.QueryInterface(ISimpleAudioVolume)
 
-            # 2. TRIGGER IF TOO LOUD
-            if actual_level > THRESHOLD and not protected:
-                trigger_level = actual_level * 100
-                protection_start_time = time.time()
-                protected = True
-                original_volume = master_vol
+                raw_peak = meter.GetPeakValue()
 
-                if USE_MUTE:
-                    volume.SetMute(1, None)
-                else:
-                    volume.SetMasterVolumeLevelScalar(LOWER_PERCENT, None)
+                if name not in app_states:
+                    app_states[name] = [volume_control.GetMasterVolume(), 0, False, 0]
 
-            # 3. PROTECTION LOGIC & VISUALS
-            if protected:
-                elapsed = time.time() - protection_start_time
+                orig_vol, start_time, is_protected, safe_ticks = app_states[name]
+                predicted_actual = raw_peak * orig_vol
 
-                if elapsed < MUTE_DURATION:
-                    # Counting down until the next check
-                    countdown = MUTE_DURATION - elapsed
-                    action_text = "MUTED" if USE_MUTE else "LOWERED"
-                    line_output = f"[{action_text}] Too Loud ({trigger_level:.1f}%) | Wait: {countdown:.1f}s"
-                else:
-                    # --- THE SAFE CHECK SEQUENCE ---
-                    line_output = "[CHECKING] Testing volume safely..."
-                    print(f"\r{line_output:<85}", end="", flush=True)
+                # Update max level for display
+                if predicted_actual > max_level:
+                    max_level = predicted_actual
+                    loudest_app = name
 
-                    # A. Mute first to prevent a sudden loud blast
-                    volume.SetMute(1, None)
-
-                    # B. Restore the original volume level behind the mute
-                    volume.SetMasterVolumeLevelScalar(original_volume, None)
-
-                    # C. Give the system a tiny fraction of a second to register the new peak
-                    time.sleep(0.1)
-
-                    # D. Check the actual level now that volume is restored
-                    check_peak = meter.GetPeakValue()
-                    check_level = check_peak * original_volume
-
-                    # E. Decide what to do next
-                    if check_level < SAFE_LEVEL:
-                        # It is safe! Unmute and exit protection mode.
-                        volume.SetMute(0, None)
-                        protected = False
+                # --- TRIGGER ---
+                if not is_protected and predicted_actual > THRESHOLD:
+                    app_states[name][0] = volume_control.GetMasterVolume()
+                    app_states[name][1] = time.time()
+                    app_states[name][2] = True
+                    if USE_MUTE:
+                        volume_control.SetMute(1, None)
                     else:
-                        # Still too loud!
-                        if not USE_MUTE:
-                            # Go back to the lowered percentage, then unmute so you can hear it
-                            volume.SetMasterVolumeLevelScalar(LOWER_PERCENT, None)
-                            volume.SetMute(0, None)
+                        volume_control.SetMasterVolume(LOWER_PERCENT, None)
 
-                        # Reset the timer so it waits another MUTE_DURATION before testing again
-                        protection_start_time = time.time()
+                # --- RESTORE ---
+                elif is_protected:
+                    any_protected = True
+                    protected_name = name
+                    elapsed = time.time() - start_time
+                    if elapsed > MUTE_DURATION and predicted_actual < SAFE_LEVEL:
+                        app_states[name][3] += 1
+                        if app_states[name][3] > 15:  # Stability check
+                            if USE_MUTE:
+                                volume_control.SetMute(0, None)
+                            else:
+                                volume_control.SetMasterVolume(orig_vol, None)
+                            app_states[name][2] = False
+                    else:
+                        app_states[name][3] = 0
 
-            # 4. NORMAL VISUAL (Only displays if we are not protected)
-            if not protected:
+            # --- SINGLE LINE VISUALS ---
+            if any_protected:
+                line = f"[PROTECT] {protected_name} is BLOCKED | Level: {max_level * 100:5.1f}%"
+            elif max_level > 0.001:
                 bar_len = 30
-                filled = int(bar_len * actual_level)
-                bar = '█' * min(filled, bar_len) + '-' * max(0, bar_len - filled)
-                line_output = f"[OK] Level: [{bar}] {actual_level * 100:5.1f}%"
-
-            # Print to console and overwrite the line
-            if protected and elapsed >= MUTE_DURATION:
-                pass  # Skip the regular print during the checking phase so we don't overwrite the [CHECKING] text too fast
+                filled = int(bar_len * max_level)
+                bar = '█' * filled + '-' * (bar_len - filled)
+                line = f"[OK] {loudest_app[:12]}: [{bar}] {max_level * 100:5.1f}%"
             else:
-                print(f"\r{line_output:<85}", end="", flush=True)
+                line = "[IDLE] Monitoring..."
 
-            time.sleep(CHECK_INTERVAL)
+            # \r moves back to start of line, <80 pads it to clear old text
+            print(f"\r{line:<80}", end="", flush=True)
+            time.sleep(0.02)
 
     except KeyboardInterrupt:
-        # Restore on exit
-        volume.SetMute(0, None)
-        if original_volume is not None:
-            volume.SetMasterVolumeLevelScalar(original_volume, None)
-        print("\n\nExiting... Volume Restored.")
+        # Cleanup
+        for session in AudioUtilities.GetAllSessions():
+            if session.Process:
+                vc = session._ctl.QueryInterface(ISimpleAudioVolume)
+                vc.SetMute(0, None)
+        print("\n\nExiting and Restoring...")
 
 
 if __name__ == "__main__":
