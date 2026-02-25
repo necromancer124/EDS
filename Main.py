@@ -8,11 +8,9 @@ THRESHOLD = 0.40
 SAFE_LEVEL = 0.35
 CHECK_INTERVAL = 0.01
 
-USE_MUTE = False      # True = mute, False = lower to 10%
-LOWER_PERCENT = 0.10  # 10%
-
-STEP_UP = 0.02
-STEP_DOWN = 0.05
+USE_MUTE = False
+LOWER_PERCENT = 0.10
+WAIT_TIME = 1.0
 
 
 def main():
@@ -39,66 +37,56 @@ def main():
         while True:
             raw_peak = meter.GetPeakValue()
             master_vol = volume.GetMasterVolumeLevelScalar()
-
-            # Always use output-based detection
             actual_level = raw_peak * master_vol
 
             line_output = ""
 
-            # Trigger
+            # --- Trigger ---
             if actual_level > THRESHOLD and not protected:
                 protected = True
+                original_volume = master_vol
 
                 if USE_MUTE:
                     volume.SetMute(1, None)
                 else:
-                    original_volume = master_vol
                     volume.SetMasterVolumeLevelScalar(LOWER_PERCENT, None)
 
-            # Protection mode
+                time.sleep(WAIT_TIME)
+
+            # --- Protection Logic ---
             if protected:
 
-                current_volume = volume.GetMasterVolumeLevelScalar()
-
-                # If still too loud → step down
-                if actual_level > SAFE_LEVEL:
-
-                    if not USE_MUTE:
-                        new_volume = max(
-                            current_volume - STEP_DOWN,
-                            LOWER_PERCENT
-                        )
-                        volume.SetMasterVolumeLevelScalar(new_volume, None)
-                        line_output = f"[STEP DOWN] {new_volume * 100:.1f}%"
-                    else:
-                        line_output = "[MUTED] Waiting..."
-
+                # Restore previous level
+                if USE_MUTE:
+                    volume.SetMute(0, None)
                 else:
-                    # Safe → step up
-                    if USE_MUTE:
-                        volume.SetMute(0, None)
-                        protected = False
-                    else:
-                        if current_volume < original_volume:
-                            new_volume = min(
-                                current_volume + STEP_UP,
-                                original_volume
-                            )
-                            volume.SetMasterVolumeLevelScalar(
-                                new_volume, None
-                            )
-                            line_output = f"[FADING UP] {new_volume * 100:.1f}%"
-                        else:
-                            # Fully restored
-                            protected = False
-                            original_volume = None
+                    volume.SetMasterVolumeLevelScalar(original_volume, None)
 
-            # Normal display
+                time.sleep(WAIT_TIME)
+
+                # Re-check output level
+                raw_peak = meter.GetPeakValue()
+                master_vol = volume.GetMasterVolumeLevelScalar()
+                actual_level = raw_peak * master_vol
+
+                if actual_level < SAFE_LEVEL:
+                    protected = False
+                    original_volume = None
+                else:
+                    # Still loud → go back to 10%
+                    if USE_MUTE:
+                        volume.SetMute(1, None)
+                    else:
+                        volume.SetMasterVolumeLevelScalar(LOWER_PERCENT, None)
+
+            # --- Visual Display ---
             if not protected:
                 bar = '█' * int(30 * actual_level) + '-' * (
                     30 - int(30 * actual_level)
                 )
                 line_output = f"[OK] Level: [{bar}] {actual_level * 100:5.1f}%"
+            else:
+                line_output = f"[PROTECT] Level: {actual_level * 100:5.1f}%"
 
             print(f"\r{line_output:<80}", end="", flush=True)
             time.sleep(CHECK_INTERVAL)
