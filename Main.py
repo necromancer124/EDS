@@ -61,14 +61,12 @@ def show_help(config):
     print("=======================================")
     print("        🐾 BEAR LIMITER HELP          ")
     print("=======================================")
-    print(f"Trigger: Above {int(config['THRESHOLD'] * 100)}%")
-    print(f"Safe Level: Below {int(config['SAFE_LEVEL'] * 100)}%")
+    print(f"Trigger: {int(config['THRESHOLD'] * 100)}% | Safe: {int(config['SAFE_LEVEL'] * 100)}%")
     print("---------------------------------------")
-    print("GHOST-CHECK LOGIC:")
-    print("1. It checks the 'raw' app volume")
-    print("   WHILE the sound is still lowered.")
-    print("2. It only un-mutes/swells IF the")
-    print("   check comes back 100% clean.")
+    print("PREDICTION CALCULATION:")
+    print("Bear calculates: RawPeak * SavedVol * Master")
+    print("This allows Bear to 'see' the spike even")
+    print("while the app is muffled or muted.")
     print("=======================================")
     input("\nPress Enter to return...")
 
@@ -77,7 +75,7 @@ def run_limiter(config):
     os.system('cls' if os.name == 'nt' else 'clear');
     os.system('color 0b')
     print("--- 🐾 BEAR PROTECT ACTIVE ---")
-    print("GHOST-CHECK + EXPONENTIAL | Ctrl+C to stop.\n")
+    print("PREDICTION MODE | Ctrl+C to stop.\n")
     devices = AudioUtilities.GetDeviceEnumerator()
     endpoint = devices.GetDefaultAudioEndpoint(0, 0)
     master_interface = endpoint.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
@@ -88,7 +86,7 @@ def run_limiter(config):
         while True:
             global_master = master_vol_control.GetMasterVolumeLevelScalar()
             sessions = AudioUtilities.GetAllSessions()
-            max_true_level, loudest_app, any_protected, protected_name = 0.0, "", False, ""
+            max_view_level, loudest_app, any_protected, protected_name = 0.0, "", False, ""
 
             for session in sessions:
                 if not session.Process: continue
@@ -100,12 +98,12 @@ def run_limiter(config):
                 app_mixer = volume_control.GetMasterVolume()
                 true_actual = raw_peak * app_mixer * global_master
 
+                # Initialize state: [OriginalVol, LockTime, IsLocked, SafetyTicks]
                 if name not in app_states: app_states[name] = [app_mixer, 0, False, 0]
-                if true_actual > max_true_level: max_true_level, loudest_app = true_actual, name
 
                 # --- 1. THE TRIGGER ---
                 if not app_states[name][2] and true_actual > config["THRESHOLD"]:
-                    app_states[name][0] = app_mixer
+                    app_states[name][0] = app_mixer  # Capture volume before drop
                     app_states[name][1] = time.time()
                     app_states[name][2] = True
                     if config["USE_MUTE"]:
@@ -113,17 +111,18 @@ def run_limiter(config):
                     else:
                         volume_control.SetMasterVolume(config["LOWER_PERCENT"], None)
 
-                # --- 2. THE GHOST-CHECK RESTORE ---
-                elif app_states[name][2]:
+                # --- 2. PREDICTION & RESTORE LOGIC ---
+                if app_states[name][2]:
                     any_protected, protected_name = True, name
                     elapsed = time.time() - app_states[name][1]
 
-                    # We check the RAW peak coming from the app
-                    # Formula: raw_peak * (original volume) * master
-                    # This tells us how loud it WOULD be if we restored right now
+                    # PREDICTION CALC: What would it be at full volume?
                     potential_volume = raw_peak * app_states[name][0] * global_master
 
-                    # If the POTENTIAL volume is still too high, reset the lock
+                    # Track highest potential for the UI bar
+                    if potential_volume > max_view_level: max_view_level = potential_volume
+
+                    # If predicted volume is still over threshold, reset timer
                     if potential_volume > config["THRESHOLD"]:
                         app_states[name][1] = time.time()
                         app_states[name][3] = 0
@@ -131,11 +130,10 @@ def run_limiter(config):
                     if elapsed >= config["MUTE_DURATION"]:
                         if potential_volume < config["SAFE_LEVEL"]:
                             app_states[name][3] += 1
-                            # Must be safe for 50 cycles BEFORE touching volume
                             if app_states[name][3] >= 50:
                                 if config["USE_MUTE"]: volume_control.SetMute(0, None)
 
-                                # --- EXPONENTIAL SWELL ---
+                                # Exponential Restore
                                 start_v = config["LOWER_PERCENT"] if not config["USE_MUTE"] else 0.001
                                 end_v = app_states[name][0]
                                 for step in range(1, 41):
@@ -147,14 +145,18 @@ def run_limiter(config):
                                 app_states[name][2], app_states[name][3] = False, 0
                         else:
                             app_states[name][3] = 0
-                    else:
-                        app_states[name][3] = 0
+                else:
+                    if true_actual > max_view_level:
+                        max_view_level = true_actual
+                        loudest_app = name
 
             # --- VISUALS ---
-            bar = '█' * int(25 * min(max_true_level, 1.0)) + '-' * (25 - int(25 * min(max_true_level, 1.0)))
+            # Bar shows PREDICTED volume when locked (Red), Actual when safe (Blue)
+            bar_len = int(25 * min(max_view_level, 1.0))
+            bar = '█' * bar_len + '-' * (25 - bar_len)
             os.system('color 0c' if any_protected else 'color 0b')
-            status = f"⚠️ [LOCKED] {protected_name[:12]}" if any_protected else f"[OK] {loudest_app[:12]}"
-            print(f"\r{status:<18} |{bar}| {int(max_true_level * 100):3}%", end="", flush=True)
+            status = f"⚠️ [PREDICT] {protected_name[:10]}" if any_protected else f"[OK] {loudest_app[:10]}"
+            print(f"\r{status:<18} |{bar}| {int(max_view_level * 100):3}%", end="", flush=True)
 
     except KeyboardInterrupt:
         os.system('color 07')
