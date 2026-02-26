@@ -4,7 +4,6 @@ import time
 import sys
 import os
 import json
-import math
 
 # --- APP DATA SETUP ---
 APP_FOLDER = os.path.join(os.getenv('APPDATA'), 'Bear_AudioLimiter')
@@ -36,8 +35,7 @@ def save_config(config):
 
 
 def setup_menu(config):
-    os.system('cls' if os.name == 'nt' else 'clear');
-    os.system('color 0e')
+    os.system('cls' if os.name == 'nt' else 'clear')
     print("--- ⚙️ Settings ---")
 
     def get_pct(prompt, current):
@@ -56,8 +54,7 @@ def setup_menu(config):
 
 
 def show_help(config):
-    os.system('cls' if os.name == 'nt' else 'clear');
-    os.system('color 0b')
+    os.system('cls' if os.name == 'nt' else 'clear')
     print("=======================================")
     print("        🐾 BEAR LIMITER HELP          ")
     print("=======================================")
@@ -72,15 +69,18 @@ def show_help(config):
 
 
 def run_limiter(config):
-    os.system('cls' if os.name == 'nt' else 'clear');
-    os.system('color 0b')
+    # Initial clear once at the start
+    os.system('cls' if os.name == 'nt' else 'clear')
     print("--- 🐾 BEAR PROTECT ACTIVE ---")
     print("PREDICTION MODE | Ctrl+C to stop.\n")
+
     devices = AudioUtilities.GetDeviceEnumerator()
     endpoint = devices.GetDefaultAudioEndpoint(0, 0)
     master_interface = endpoint.Activate(IAudioEndpointVolume._iid_, CLSCTX_ALL, None)
     master_vol_control = master_interface.QueryInterface(IAudioEndpointVolume)
     app_states = {}
+
+    last_was_protected = False
 
     try:
         while True:
@@ -98,12 +98,11 @@ def run_limiter(config):
                 app_mixer = volume_control.GetMasterVolume()
                 true_actual = raw_peak * app_mixer * global_master
 
-                # Initialize state: [OriginalVol, LockTime, IsLocked, SafetyTicks]
                 if name not in app_states: app_states[name] = [app_mixer, 0, False, 0]
 
                 # --- 1. THE TRIGGER ---
                 if not app_states[name][2] and true_actual > config["THRESHOLD"]:
-                    app_states[name][0] = app_mixer  # Capture volume before drop
+                    app_states[name][0] = app_mixer
                     app_states[name][1] = time.time()
                     app_states[name][2] = True
                     if config["USE_MUTE"]:
@@ -115,14 +114,10 @@ def run_limiter(config):
                 if app_states[name][2]:
                     any_protected, protected_name = True, name
                     elapsed = time.time() - app_states[name][1]
-
-                    # PREDICTION CALC: What would it be at full volume?
                     potential_volume = raw_peak * app_states[name][0] * global_master
 
-                    # Track highest potential for the UI bar
                     if potential_volume > max_view_level: max_view_level = potential_volume
 
-                    # If predicted volume is still over threshold, reset timer
                     if potential_volume > config["THRESHOLD"]:
                         app_states[name][1] = time.time()
                         app_states[name][3] = 0
@@ -132,8 +127,6 @@ def run_limiter(config):
                             app_states[name][3] += 1
                             if app_states[name][3] >= 50:
                                 if config["USE_MUTE"]: volume_control.SetMute(0, None)
-
-                                # Exponential Restore
                                 start_v = config["LOWER_PERCENT"] if not config["USE_MUTE"] else 0.001
                                 end_v = app_states[name][0]
                                 for step in range(1, 41):
@@ -141,7 +134,6 @@ def run_limiter(config):
                                     new_v = start_v * (end_v / start_v) ** ratio
                                     volume_control.SetMasterVolume(new_v, None)
                                     time.sleep(0.001)
-
                                 app_states[name][2], app_states[name][3] = False, 0
                         else:
                             app_states[name][3] = 0
@@ -150,25 +142,40 @@ def run_limiter(config):
                         max_view_level = true_actual
                         loudest_app = name
 
-            # --- VISUALS ---
-            # Bar shows PREDICTED volume when locked (Red), Actual when safe (Blue)
+            # --- VISUALS (FIXED FLICKER) ---
+            # Instead of os.system('color'), we use ANSI colors to avoid screen flash
+            RED = "\033[91m"
+            CYAN = "\033[96m"
+            RESET = "\033[0m"
+
             bar_len = int(25 * min(max_view_level, 1.0))
             bar = '█' * bar_len + '-' * (25 - bar_len)
-            os.system('color 0c' if any_protected else 'color 0b')
+
+            color = RED if any_protected else CYAN
             status = f"⚠️ [PREDICT] {protected_name[:10]}" if any_protected else f"[OK] {loudest_app[:10]}"
-            print(f"\r{status:<18} |{bar}| {int(max_view_level * 100):3}%", end="", flush=True)
+
+            # \r moves cursor to start of line, \033[K clears the rest of the line
+            print(f"\r{color}{status:<18} |{bar}| {int(max_view_level * 100):3}%{RESET}\033[K", end="", flush=True)
+
+            time.sleep(0.01)  # Small delay to prevent CPU pegging
 
     except KeyboardInterrupt:
-        os.system('color 07')
+        # Reset colors and unmute all on exit
+        print("\033[0m")
         for session in AudioUtilities.GetAllSessions():
-            if session.Process: session._ctl.QueryInterface(ISimpleAudioVolume).SetMute(0, None)
+            if session.Process:
+                try:
+                    session._ctl.QueryInterface(ISimpleAudioVolume).SetMute(0, None)
+                except:
+                    pass
         print("\n\n🐾 Bear is sleeping.")
 
 
 def main_menu():
+    # Enable ANSI support for Windows 10+
+    os.system('')
     while True:
         config = load_config()
-        os.system('color 0e');
         os.system('cls' if os.name == 'nt' else 'clear')
         mode = "MUTE" if config["USE_MUTE"] else f"DROP TO {int(config['LOWER_PERCENT'] * 100)}%"
         print("=======================================")
