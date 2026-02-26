@@ -48,7 +48,6 @@ def setup_menu(config):
         val = input(f"{prompt} [Current: {current_pct}%]: ").strip()
         if not val: return current_decimal
         try:
-            # Convert user 0-100 input back to 0.0-1.0 for the code
             new_val = float(val) / 100
             return max(0.0, min(1.0, new_val))
         except ValueError:
@@ -133,20 +132,20 @@ def run_limiter(config):
 
                 meter = session._ctl.QueryInterface(IAudioMeterInformation)
                 volume_control = session._ctl.QueryInterface(ISimpleAudioVolume)
-
                 raw_peak = meter.GetPeakValue()
 
                 if name not in app_states:
+                    # [OrigMixerVol, StartTime, IsProtected, SafeCounter]
                     app_states[name] = [volume_control.GetMasterVolume(), 0, False, 0]
 
-                # Accurate Math: Peak scaled only by Master Volume
+                # Core Logic: Scale peak by Windows Master Volume
                 true_actual = raw_peak * global_master_vol
 
                 if true_actual > max_true_level:
                     max_true_level = true_actual
                     loudest_app = name
 
-                # --- TRIGGER ---
+                # --- PROTECTION TRIGGER ---
                 if not app_states[name][2] and true_actual > config["THRESHOLD"]:
                     app_states[name][0] = volume_control.GetMasterVolume()
                     app_states[name][1] = time.time()
@@ -156,7 +155,7 @@ def run_limiter(config):
                     else:
                         volume_control.SetMasterVolume(config["LOWER_PERCENT"], None)
 
-                # --- RESTORE ---
+                # --- RESTORE LOGIC ---
                 elif app_states[name][2]:
                     any_protected = True
                     protected_name = name
@@ -164,7 +163,7 @@ def run_limiter(config):
 
                     if elapsed > config["MUTE_DURATION"] and true_actual < config["SAFE_LEVEL"]:
                         app_states[name][3] += 1
-                        if app_states[name][3] > 10:
+                        if app_states[name][3] > 10:  # Must stay safe for 10 ticks
                             if config["USE_MUTE"]:
                                 volume_control.SetMute(0, None)
                             else:
@@ -174,18 +173,19 @@ def run_limiter(config):
                     else:
                         app_states[name][3] = 0
 
+            # --- VISUAL FEEDBACK ---
             if any_protected:
-                os.system('color 0c')
+                os.system('color 0c')  # Flash Red
                 line = f"⚠️ [PROTECTING] {protected_name} is too LOUD!"
             else:
-                os.system('color 0b')
+                os.system('color 0b')  # Light Blue
                 bar_len = 25
                 filled = int(bar_len * min(max_true_level, 1.0))
                 bar = '█' * filled + '-' * (bar_len - filled)
                 line = f"[OK] {loudest_app[:12]:<12} |{bar}| {int(max_true_level * 100):3}%"
 
             print(f"\r{line:<80}", end="", flush=True)
-            time.sleep(0.01)
+            time.sleep(0.01)  # High speed polling
 
     except KeyboardInterrupt:
         os.system('color 07')
@@ -199,7 +199,7 @@ def run_limiter(config):
 def main_menu():
     while True:
         config = load_config()
-        os.system('color 0e')
+        os.system('color 0e')  # Yellow Menu
         os.system('cls' if os.name == 'nt' else 'clear')
         mode = "MUTE" if config["USE_MUTE"] else f"DROP TO {int(config['LOWER_PERCENT'] * 100)}%"
 
