@@ -40,7 +40,7 @@ def main():
                 if predicted_actual > max_level:
                     max_level = predicted_actual
                     loudest_app = name
-
+ #
                 # --- TRIGGER ---
                 if not is_protected and predicted_actual > THRESHOLD:
                     app_states[name][0] = volume_control.GetMasterVolume()
