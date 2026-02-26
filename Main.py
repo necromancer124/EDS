@@ -10,23 +10,20 @@ APP_FOLDER = os.path.join(os.getenv('APPDATA'), 'Bear_AudioLimiter')
 CONFIG_FILE = os.path.join(APP_FOLDER, 'config.json')
 
 DEFAULT_CONFIG = {
-    "THRESHOLD": 0.25,
-    "SAFE_LEVEL": 0.20,
-    "MUTE_DURATION": 2.0,
+    "THRESHOLD": 0.20,  # Internal: 0.20 | User: 20%
+    "SAFE_LEVEL": 0.15,  # Internal: 0.15 | User: 15%
+    "MUTE_DURATION": 1.5,
     "USE_MUTE": False,
-    "LOWER_PERCENT": 0.20
+    "LOWER_PERCENT": 0.10  # Internal: 0.10 | User: 10%
 }
 
 
 def load_config():
-    """Loads the config from AppData, or creates it if it doesn't exist."""
     if not os.path.exists(APP_FOLDER):
         os.makedirs(APP_FOLDER)
-
     if not os.path.exists(CONFIG_FILE):
         save_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
-
     try:
         with open(CONFIG_FILE, 'r') as f:
             return json.load(f)
@@ -35,24 +32,34 @@ def load_config():
 
 
 def save_config(config):
-    """Saves the config dictionary to AppData."""
     with open(CONFIG_FILE, 'w') as f:
         json.dump(config, f, indent=4)
 
 
 def setup_menu(config):
-    """Interactive menu to change settings."""
     os.system('cls' if os.name == 'nt' else 'clear')
-    print("--- Settings Configuration ---")
-    print("Leave blank and press Enter to keep the current value.\n")
+    os.system('color 0e')
+    print("--- ⚙️ User-Friendly Settings ---")
+    print("Enter whole numbers (1-100) for percentages.")
+    print("Leave blank to keep the current value.\n")
+
+    def get_percent_input(prompt, current_decimal):
+        current_pct = int(current_decimal * 100)
+        val = input(f"{prompt} [Current: {current_pct}%]: ").strip()
+        if not val: return current_decimal
+        try:
+            # Convert user 0-100 input back to 0.0-1.0 for the code
+            new_val = float(val) / 100
+            return max(0.0, min(1.0, new_val))
+        except ValueError:
+            return current_decimal
 
     def get_float(prompt, current):
-        val = input(f"{prompt} [Current: {current}]: ").strip()
+        val = input(f"{prompt} [Current: {current}s]: ").strip()
         if not val: return current
         try:
             return float(val)
         except ValueError:
-            print("Invalid number. Keeping current value.")
             return current
 
     def get_bool(prompt, current):
@@ -60,43 +67,48 @@ def setup_menu(config):
         if not val: return current
         return val == 'y'
 
-    config["THRESHOLD"] = get_float("Set Trigger THRESHOLD (e.g., 0.25 for 25%)", config["THRESHOLD"])
-    config["SAFE_LEVEL"] = get_float("Set SAFE_LEVEL to restore volume (e.g., 0.20 for 20%)", config["SAFE_LEVEL"])
-    config["MUTE_DURATION"] = get_float("Set MUTE_DURATION in seconds (e.g., 2.0)", config["MUTE_DURATION"])
-    config["USE_MUTE"] = get_bool("Mute completely instead of lowering volume?", config["USE_MUTE"])
-    config["LOWER_PERCENT"] = get_float("If not muting, set LOWER_PERCENT volume (e.g., 0.20 for 20%)",
-                                        config["LOWER_PERCENT"])
+    config["THRESHOLD"] = get_percent_input("Set Trigger THRESHOLD (1-100%)", config["THRESHOLD"])
+    config["SAFE_LEVEL"] = get_percent_input("Set SAFE_LEVEL to restore (1-100%)", config["SAFE_LEVEL"])
+    config["MUTE_DURATION"] = get_float("Set MUTE_DURATION (seconds)", config["MUTE_DURATION"])
+    config["USE_MUTE"] = get_bool("Mute completely?", config["USE_MUTE"])
+    if not config["USE_MUTE"]:
+        config["LOWER_PERCENT"] = get_percent_input("Set volume level to DROP to", config["LOWER_PERCENT"])
 
     save_config(config)
-    print("\nSettings saved successfully to:", CONFIG_FILE)
-    time.sleep(2)
+    print("\n✅ Settings saved and converted!")
+    time.sleep(1.5)
 
 
-def show_help():
-    """Displays help information and definitions."""
+def show_help(config):
     os.system('cls' if os.name == 'nt' else 'clear')
+    os.system('color 0b')
+    action = "MUTE" if config['USE_MUTE'] else f"LOWER to {int(config['LOWER_PERCENT'] * 100)}%"
+
     print("==================================================")
-    print("                   HELP & INFO                    ")
+    print("               🐾 BEAR HELP & STATUS              ")
     print("==================================================")
-    print("How it works:")
-    print("This app monitors the 'True Volume' of every individual app.")
-    print("If an app spikes too loud, it gets muted or lowered instantly.\n")
-    print("Settings Explanation:")
-    print(" - THRESHOLD:     The volume % that triggers the protection.")
-    print(" - SAFE_LEVEL:    The volume % required to be considered 'safe' again.")
-    print(" - MUTE_DURATION: How long (seconds) to wait before checking if safe.")
-    print(" - USE_MUTE:      If Yes, mutes the app completely. If No, just lowers it.")
-    print(" - LOWER_PERCENT: The volume % to drop to if USE_MUTE is No.\n")
-    print(f"Config File Location:\n{CONFIG_FILE}")
+    print(f" CURRENT LIVE SETTINGS:")
+    print(f" > Trigger Protection: Above {int(config['THRESHOLD'] * 100)}%")
+    print(f" > Recovery Level:     Below {int(config['SAFE_LEVEL'] * 100)}%")
+    print(f" > Cooldown Wait:      {config['MUTE_DURATION']} seconds")
+    print(f" > Bear's Action:      {action}")
     print("==================================================")
-    input("\nPress Enter to return to the menu...")
+    print("\nHow the 'True Volume' Math Works:")
+    print("Actual Sound = (App Peak) * (Windows Master Volume)")
+    print("\nExample:")
+    print("- If Windows is 100% and App spikes to 50% -> Bear sees 50%.")
+    print("- If Windows is 50% and App spikes to 50%  -> Bear sees 25%.")
+    print("\nThis ensures that if you lower your Master volume,")
+    print("the limiter becomes more 'relaxed' automatically.")
+    print("==================================================")
+    input("\nPress Enter to return to menu...")
 
 
 def run_limiter(config):
-    """The main monitoring loop."""
     os.system('cls' if os.name == 'nt' else 'clear')
-    print("--- True Volume Per-App Limiter Active ---")
-    print("Press Ctrl+C to stop.\n")
+    os.system('color 0b')
+    print("--- 🐾 BEAR PROTECT ACTIVE ---")
+    print("Reaction Speed: MAX | Press Ctrl+C to stop.\n")
 
     devices = AudioUtilities.GetDeviceEnumerator()
     endpoint = devices.GetDefaultAudioEndpoint(0, 0)
@@ -110,33 +122,33 @@ def run_limiter(config):
             global_master_vol = master_volume_control.GetMasterVolumeLevelScalar()
             sessions = AudioUtilities.GetAllSessions()
 
-            loudest_app = ""
             max_true_level = 0.0
+            loudest_app = ""
             any_protected = False
             protected_name = ""
 
             for session in sessions:
                 if not session.Process: continue
                 name = session.Process.name()
+
                 meter = session._ctl.QueryInterface(IAudioMeterInformation)
                 volume_control = session._ctl.QueryInterface(ISimpleAudioVolume)
 
                 raw_peak = meter.GetPeakValue()
-                app_mixer_vol = volume_control.GetMasterVolume()
 
                 if name not in app_states:
-                    app_states[name] = [app_mixer_vol, 0, False, 0]
+                    app_states[name] = [volume_control.GetMasterVolume(), 0, False, 0]
 
-                orig_vol, start_time, is_protected, safe_ticks = app_states[name]
-                true_actual = raw_peak * app_mixer_vol * global_master_vol
+                # Accurate Math: Peak scaled only by Master Volume
+                true_actual = raw_peak * global_master_vol
 
                 if true_actual > max_true_level:
                     max_true_level = true_actual
                     loudest_app = name
 
                 # --- TRIGGER ---
-                if not is_protected and true_actual > config["THRESHOLD"]:
-                    app_states[name][0] = app_mixer_vol
+                if not app_states[name][2] and true_actual > config["THRESHOLD"]:
+                    app_states[name][0] = volume_control.GetMasterVolume()
                     app_states[name][1] = time.time()
                     app_states[name][2] = True
                     if config["USE_MUTE"]:
@@ -145,59 +157,56 @@ def run_limiter(config):
                         volume_control.SetMasterVolume(config["LOWER_PERCENT"], None)
 
                 # --- RESTORE ---
-                elif is_protected:
+                elif app_states[name][2]:
                     any_protected = True
                     protected_name = name
-                    elapsed = time.time() - start_time
+                    elapsed = time.time() - app_states[name][1]
+
                     if elapsed > config["MUTE_DURATION"] and true_actual < config["SAFE_LEVEL"]:
                         app_states[name][3] += 1
-                        if app_states[name][3] > 15:
+                        if app_states[name][3] > 10:
                             if config["USE_MUTE"]:
                                 volume_control.SetMute(0, None)
                             else:
-                                volume_control.SetMasterVolume(orig_vol, None)
+                                volume_control.SetMasterVolume(app_states[name][0], None)
                             app_states[name][2] = False
+                            app_states[name][3] = 0
                     else:
                         app_states[name][3] = 0
 
-            # --- VISUALS ---
             if any_protected:
-                line = f"[PROTECT] {protected_name} BLOCKED | True Level: {max_true_level * 100:5.1f}%"
-            elif max_true_level > 0.001:
-                bar_len = 30
+                os.system('color 0c')
+                line = f"⚠️ [PROTECTING] {protected_name} is too LOUD!"
+            else:
+                os.system('color 0b')
+                bar_len = 25
                 filled = int(bar_len * min(max_true_level, 1.0))
                 bar = '█' * filled + '-' * (bar_len - filled)
-                line = f"[OK] {loudest_app[:12]}: [{bar}] {max_true_level * 100:5.1f}%"
-            else:
-                line = "[IDLE] Monitoring True Output..."
+                line = f"[OK] {loudest_app[:12]:<12} |{bar}| {int(max_true_level * 100):3}%"
 
             print(f"\r{line:<80}", end="", flush=True)
-            time.sleep(0.02)
+            time.sleep(0.01)
 
     except KeyboardInterrupt:
+        os.system('color 07')
         for session in AudioUtilities.GetAllSessions():
             if session.Process:
                 vc = session._ctl.QueryInterface(ISimpleAudioVolume)
                 vc.SetMute(0, None)
-        print("\n\nExiting and Restoring...")
+        print("\n\n🐾 Bear is sleeping. Volumes restored.")
 
 
 def main_menu():
-    """Main application loop."""
-    config = load_config()
-
     while True:
+        config = load_config()
+        os.system('color 0e')
         os.system('cls' if os.name == 'nt' else 'clear')
-
-        # Display Current Settings on the Home Screen
-        mute_mode_text = "MUTE completely" if config["USE_MUTE"] else f"LOWER to {config['LOWER_PERCENT'] * 100:.0f}%"
+        mode = "MUTE" if config["USE_MUTE"] else f"DROP TO {int(config['LOWER_PERCENT'] * 100)}%"
 
         print("=======================================")
-        print("        BEAR AUDIO LIMITER APP         ")
+        print("        🐾 BEAR AUDIO LIMITER          ")
         print("=======================================")
-        print(f" Current Config:")
-        print(f"   Trigger: > {config['THRESHOLD'] * 100:.0f}%   | Restore: < {config['SAFE_LEVEL'] * 100:.0f}%")
-        print(f"   Wait: {config['MUTE_DURATION']} seconds | Action: {mute_mode_text}")
+        print(f" LIMIT: {int(config['THRESHOLD'] * 100)}% | ACTION: {mode}")
         print("=======================================")
         print("1. Start Limiter")
         print("2. Setup / Settings")
@@ -205,7 +214,7 @@ def main_menu():
         print("4. Exit")
         print("=======================================")
 
-        choice = input("Select an option (1-4): ").strip()
+        choice = input("Select (1-4): ").strip()
 
         if choice == '1':
             run_limiter(config)
@@ -213,13 +222,9 @@ def main_menu():
         elif choice == '2':
             setup_menu(config)
         elif choice == '3':
-            show_help()
+            show_help(config)
         elif choice == '4':
-            print("Goodbye!")
             sys.exit()
-        else:
-            print("Invalid choice. Please enter 1, 2, 3, or 4.")
-            time.sleep(1)
 
 
 if __name__ == "__main__":
