@@ -58,7 +58,7 @@ def setup_menu(config):
         val = input(f"{prompt} [Current: {current}s]: ").strip()
         if not val: return current
         try:
-            return float(val)2
+            return float(val)
         except ValueError:
             return current
 

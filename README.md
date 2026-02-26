@@ -6,8 +6,7 @@
 
 * **True Volume Calculation**: Uses the precise formula:
 
-$$V_{true} = \text{Peak} \times \text{App\_Slider} \times \text{Master\_Slider}$$
-
+> **Formula:** `Actual Volume = Peak × App Volume × Master Volume`
 
 * **Persistent Settings**: Saves your configuration to `%APPDATA%\Bear_AudioLimiter\config.json` so your settings are remembered every time you launch.
 * **Two Protection Modes**: Choose between completely muting a loud app or dynamically lowering its volume to a safe percentage.
