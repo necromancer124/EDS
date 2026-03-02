@@ -68,7 +68,6 @@ Once installed, look for your **custom icon** in the System Tray (near the clock
 
 This project is open-source. Please see the [LICENSE](https://github.com/necromancer124/BE/blob/master/LICENCE) file for details.
 
-
 ## 🔒 Version Integrity (v1.0.0)
 To ensure you have the official, untampered version of Bear Limiter, you can verify the file hash of `BearLimiter.pyw`:
 
