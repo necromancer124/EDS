@@ -68,16 +68,6 @@ Once installed, look for your **custom icon** in the System Tray (near the clock
 
 This project is open-source. Please see the [LICENSE](https://github.com/necromancer124/BE/blob/master/LICENCE) file for details.
 
-## 🔒 Version Integrity (v1.0.0)
-To ensure you have the official, untampered version of Bear Limiter, you can verify the file hash of `BearLimiter.pyw`:
-
-* **Version:** 1.0.0 "Initial GUI Release"
-Perfect! That output is exactly what you need. It looks professional and gives your users total confidence that the code hasn't been modified.
-
-Here is the **Security & Integrity** section formatted for your `README.md`. You can paste this right at the bottom of the file.
-
----
-
 ### 🛡️ Security & Integrity Verification (v1.0.0)
 
 To ensure you are running the official, untampered version of **Bear**, you can verify the SHA-256 hashes. Compare the output of your local files with the official manifest below.
