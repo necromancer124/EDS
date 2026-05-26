@@ -2,16 +2,7 @@
 title 🐾 Bear Audio Limiter - Setup
 color 0b
 echo ===========================================
-echo    1. Installing Audio Dependencies...
-echo ===========================================
-echo.
-
-:: Install all necessary libraries
-py -m pip install pycaw comtypes Pillow pystray pywin32
-
-echo.
-echo ===========================================
-echo    ✅ Core Installation Complete!
+echo    🐾 BEAR AUDIO LIMITER INSTALLER
 echo ===========================================
 echo.
 
@@ -26,8 +17,8 @@ goto startup_ask
 :set_startup
 echo.
 echo Setting up Startup Shortcut...
-:: This creates a temporary VBS script to create the Windows Shortcut
-set SCRIPT_PATH=%~dp0BearLimiter.pyw
+
+set EXE_PATH=%~dp0Bear.exe
 set STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup
 set LNK_NAME=BearAudioLimiter.lnk
 
@@ -35,10 +26,9 @@ set LNK_NAME=BearAudioLimiter.lnk
 echo Set oWS = CreateObject("WScript.Shell"^)
 echo sLinkFile = "%STARTUP_DIR%\%LNK_NAME%"
 echo Set oLink = oWS.CreateShortcut(sLinkFile^)
-echo oLink.TargetPath = "pythonw.exe"
-echo oLink.Arguments = """%SCRIPT_PATH%"""
+echo oLink.TargetPath = "%EXE_PATH%"
 echo oLink.WorkingDirectory = "%~dp0"
-echo oLink.IconLocation = "%~dp0icon.png"
+echo oLink.IconLocation = "%EXE_PATH%"
 echo oLink.Save
 ) > "%temp%\MakeShortcut.vbs"
 
@@ -53,5 +43,5 @@ echo ===========================================
 echo    🐾 BEAR IS READY TO PROTECT!
 echo ===========================================
 echo.
-echo You can now close this window and run BearLimiter.pyw
+echo You can now close this window and run Bear.exe
 pause
