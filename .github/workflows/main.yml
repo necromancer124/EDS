@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout repository
@@ -24,14 +26,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install pyinstaller pycaw comtypes Pillow pystray pywin32
 
-    - name: Build EXE with PyInstaller
+    - name: Build EXE with Bear Icon
       run: |
-        pyinstaller --noconsole --onefile --add-data "Bear_logo.png;." --add-data "icon.png;." --icon=icon.png Bear.pyw
-
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: Bear-Build-Windows
-        path: |
-          dist/Bear.exe
-          Install_Bear.bat
+        pyinstaller --noconsole --onefile --add-data "Bear_logo.png;." --add-data "icon.png;." --icon="Bear_logo.png" Bear
