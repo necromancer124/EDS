@@ -269,10 +269,15 @@ def setup_tray():
 
     def on_quit(icon):
         global running
-        running = False
-        icon.stop()
-        root.quit()
-
+        running = False  # Tells the limiter_logic while-loop to stop
+        icon.stop()      # Stops the tray icon
+        if root:
+            root.quit()  # Stops the hidden Tkinter window
+        
+        # Give the thread a tiny moment to close, then force exit
+        time.sleep(0.2)
+        os._exit(0)      # This kills the entire process immediately
+        
     menu = pystray.Menu(
         item('Show Monitor', show_monitor),
         item('Settings', open_settings),
