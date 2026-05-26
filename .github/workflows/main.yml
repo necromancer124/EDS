@@ -2,7 +2,9 @@ name: Build Bear Audio Limiter
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "windows-master" ]
+  pull_request:
+    branches: [ "windows-master" ]
 
 jobs:
   build:
@@ -22,15 +24,14 @@ jobs:
         python -m pip install --upgrade pip
         pip install pyinstaller pycaw comtypes Pillow pystray pywin32
 
-    - name: Build EXE
+    - name: Build EXE with PyInstaller
       run: |
         pyinstaller --noconsole --onefile --add-data "Bear_logo.png;." --add-data "icon.png;." --icon=icon.png Bear.pyw
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: Bear-Installer-Package
+        name: Bear-Build-Windows
         path: |
           dist/Bear.exe
           Install_Bear.bat
-          icon.png
