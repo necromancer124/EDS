@@ -203,7 +203,17 @@ def _create_settings_win():
 
 def show_monitor():
     root.after(0, _create_monitor_win)
+    
+def resource_path(relative_path):
+    """ Get absolute path to resource, works for dev and for PyInstaller """
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
+# Example of how to use it in your code:
+# logo_image = Image.open(resource_path("Bear_logo.png"))
 
 def _create_monitor_win():
     global max_vol_var, loudest_app_var, status_var
