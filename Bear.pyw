@@ -53,13 +53,15 @@ tk_icon = None
 
 # --- ICON LOADER ---
 def load_my_icon():
-    """Loads your custom icon.png file."""
-    if os.path.exists(ICON_PATH):
-        return Image.open(ICON_PATH)
+    """Loads your custom icon.png file using the resource_path."""
+    # Use resource_path to find the file inside the compiled EXE
+    path = resource_path("icon.png") 
+    
+    if os.path.exists(path):
+        return Image.open(path)
     else:
-        # Fallback to a simple colored square if file is missing so it doesn't crash
+        # Fallback to a simple colored square if file is missing
         return Image.new('RGB', (64, 64), color=(255, 140, 0))
-
 
 # --- THE LOGIC (Prediction & Protection) ---
 def limiter_logic():
@@ -284,9 +286,15 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.withdraw()
 
-    # Load icon once for the Windows
+    # Load icon once for the Windows using the updated loader
     my_img = load_my_icon()
     tk_icon = ImageTk.PhotoImage(my_img)
+    
+    # Ensure the root window also has the icon (even if hidden)
+    try:
+        root.iconphoto(False, tk_icon)
+    except:
+        pass
 
     threading.Thread(target=limiter_logic, daemon=True).start()
     threading.Thread(target=setup_tray, daemon=True).start()
