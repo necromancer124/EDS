@@ -64,11 +64,11 @@ Once installed, look for your **custom icon** in the System Tray (near the clock
 
 ---
 
-## 🛡️ License
+## 🛡️ License 
 
 This project is open-source. Please see the [LICENSE](https://github.com/necromancer124/BE/blob/master/LICENCE) file for details.
 
-### 🛡️ Security & Integrity Verification (v1.0.0)
+### 🛡️ Security & Integrity Verification (v1.0.0) (OLD)
 
 To ensure you are running the official, untampered version of **Bear**, you can verify the SHA-256 hashes. Compare the output of your local files with the official manifest below.
 
