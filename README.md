@@ -68,17 +68,9 @@ Once installed, look for your **custom icon** in the System Tray (near the clock
 
 This project is open-source. Please see the [LICENSE](https://github.com/necromancer124/BE/blob/master/LICENCE) file for details.
 
-### 🛡️ Security & Integrity Verification (v1.0.0) (OLD)
+### 🛡️ Security & Integrity Verification (v1.0.6)
 
 To ensure you are running the official, untampered version of **Bear**, you can verify the SHA-256 hashes. Compare the output of your local files with the official manifest below.
-
-#### Official Manifest
-
-| SHA-256 Hash | File Name |
-| --- | --- |
-| `ADA278CE5BB09FB43B6CEEFA7897E904554E0D31971C69A48489D02F03E9D38F` | **Bear.pyw** |
-| `27B242B9FCA8130238EFFDABDC3B2EBEBC4F6B986D8729F7ECED0F3313E10E55` | **icon.png** |
-| `2E2296B96D10A11701D81781E16F968BBEA0F5451965148C995D0C5A1CB9CD40` | **Install_Bear.bat** |
 
 #### How to verify on your machine
 
