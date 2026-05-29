@@ -270,22 +270,23 @@ def _create_monitor_win():
 def setup_tray():
     icon_img = load_my_icon()
 
-def on_quit(icon):
+    def on_quit(icon, item):
         global running
-        running = False  # Tells the limiter_logic while-loop to stop
-        icon.stop()      # Stops the tray icon
+        running = False
+        icon.stop()
+
         if root:
-            root.quit()  # Stops the hidden Tkinter window
-        
-        # Give the thread a tiny moment to close, then force exit
+            root.quit()
+
         time.sleep(0.2)
-        os._exit(0)      # This kills the entire process immediately
+        os._exit(0)
 
     menu = pystray.Menu(
         item('Show Monitor', show_monitor),
         item('Settings', open_settings),
         item('Exit', on_quit)
     )
+
     icon = pystray.Icon("BearLimiter", icon_img, "Bear Audio Limiter", menu)
     icon.run()
 
