@@ -1,0 +1,4 @@
+pycaw
+comtypes
+pystray
+Pillow

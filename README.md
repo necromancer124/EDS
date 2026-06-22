@@ -1,82 +1,42 @@
-# 🐾 Bear Audio Limiter
+# 🐻 Bear Audio Limiter
+A "True Volume" per-app audio limiter for Windows that prevents sudden loud spikes from ruining your hearing or your speakers.
 
-**Bear** is a "True Volume" per-app limiter for Windows. Unlike standard limiters that only look at your master volume slider, Bear uses **Prediction Logic** to calculate the actual output reaching your ears by factoring in the App's Mixer Level, Global Master Volume, and Audio Peak in real-time.
+## 🚀 Overview
+Bear Audio Limiter calculates the real output volume by multiplying the **Peak Volume x App Volume x Master Volume**. If any application exceeds a defined threshold, Bear instantly lowers its volume or mutes it, then gradually restores it once the audio is safe.
 
 ## ✨ Features
+- **Real-time Monitoring**: Tracks the actual output of every running application.
+- **Predictive Protection**: Instantly reacts to audio spikes before they hit your ears.
+- **Customizable Thresholds**: Adjust trigger levels, safe return levels, and mute durations.
+- **System Tray Integration**: Runs quietly in the background with a monitor window for real-time stats.
+- **Smart Recovery**: Gradually fades volume back to original levels to avoid jarring jumps.
 
-* **Prediction Logic**: Calculates $TrueActual = RawPeak \times AppVolume \times MasterVolume$. This allows Bear to "see" if an app is still loud even while it is muted or muffled.
-* **Stealth Background Mode**: Runs as a `.pyw` file, staying hidden in your System Tray (the arrow) with your custom icon.
-* **Visual Monitor**: A GUI window showing a live percentage of the loudest app and a "DEFENDING" status indicator.
-* **Smooth Restore**: Uses exponential math to fade volume back in smoothly—preventing "audio pops" when the protection releases.
-* **Persistence**: Auto-saves your settings to `%APPDATA%\Bear_AudioLimiter\config.json`.
+## 🛠️ Installation
 
----
+### Prerequisites
+- Windows OS
+- Python 3.8+
 
-## 🚀 Installation & Setup
+### Setup
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/necromancer124/BE.git
+   cd BE
+   ```
+2. Install required dependencies:
+   ```bash
+   pip install pycaw comtypes pystray Pillow
+   ```
+3. Run the application:
+   ```bash
+   python Bear.pyw
+   ```
 
-### 1. Requirements
+## ⚙️ Configuration
+The app saves your settings in `%APPDATA%/Bear_AudioLimiter/config.json`.
+- **Threshold**: The volume level that triggers protection.
+- **Safe Level**: The volume level that must be reached before restoring original volume.
+- **Mute Duration**: How long to hold the volume low.
 
-* **Windows 10 or 11**
-* **Python 3.10+** (Make sure "Add to PATH" was checked during Python installation)
-
-### 2. One-Click Setup
-
-1. Download the repository and ensure `BearLimiter.pyw`, `icon.png`, and `Install_Bear.bat` are in the same folder.
-2. Double-click **`Install_Bear.bat`**.
-3. The installer will:
-* Install all dependencies (`pycaw`, `Pillow`, `pystray`, etc.).
-* **Ask to run at Startup**: Type `y` to have Bear protect your ears automatically every time you turn on your PC.
-
-
-
----
-
-## 🎮 Usage
-
-### Controls
-
-Once installed, look for your **custom icon** in the System Tray (near the clock). Right-click it to:
-
-* **Show Monitor**: Open the live "VU Meter" to see which app is currently the loudest.
-* **Settings**: Open the GUI to adjust thresholds and mute durations.
-* **Exit**: Completely closes the limiter and restores all app volumes.
-
----
-
-## ⚙️ Configuration Options
-
-| Setting | Description |
-| --- | --- |
-| **Trigger Threshold** | The volume level (e.g., 20%) that triggers protection. |
-| **Safe Level** | The level the audio must drop below before Bear restores volume. |
-| **Mute Duration** | How many seconds to wait before attempting to restore volume. |
-| **Drop Volume To** | If "Mute" is off, Bear will muffle the app to this specific level. |
-| **Mute Mode** | Toggle between completely silencing a spike or just lowering it. |
-
----
-
-## 📂 Project Structure
-
-* `BearLimiter.pyw`: The core application (runs in the background).
-* `icon.png`: Your custom branding for the tray and windows.
-* `Install_Bear.bat`: The primary installer and startup-configurer.
-* `config.json`: Found in `AppData\Roaming\Bear_AudioLimiter`.
-
----
-
-## 🛡️ License 
-
-This project is open-source. Please see the [LICENSE](https://github.com/necromancer124/BE/blob/master/LICENCE) file for details.
-
-### 🛡️ Security & Integrity Verification (v1.0.6)
-
-To ensure you are running the official, untampered version of **Bear**, you can verify the SHA-256 hashes. Compare the output of your local files with the official manifest below.
-
-#### How to verify on your machine
-
-Open **PowerShell** in the project folder and run this one-liner:
-
-```powershell
-Get-FileHash Bear.pyw, icon.png, Install_Bear.bat | Select-Object Hash, @{N='Name';E={Split-Path $_.Path -Leaf}} | Format-Table -AutoSize
-
-```
+## 📜 License
+This project is licensed under the MIT License.
