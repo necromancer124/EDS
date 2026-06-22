@@ -18,19 +18,7 @@ Bear Audio Limiter calculates the real output volume by multiplying the **Peak V
 - Python 3.8+
 
 ### Setup
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/necromancer124/BE.git
-   cd BE
-   ```
-2. Install required dependencies:
-   ```bash
-   pip install pycaw comtypes pystray Pillow
-   ```
-3. Run the application:
-   ```bash
-   python Bear.pyw
-   ```
+in releases
 
 ## ⚙️ Configuration
 The app saves your settings in `%APPDATA%/Bear_AudioLimiter/config.json`.
